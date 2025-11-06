@@ -1,0 +1,1212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>The Wanderer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Tailwind for layout/theme -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Import map for Gemini Live SDK -->
+  <script type="importmap">
+  {
+    "imports": {
+      "@google/genai": "https://aistudiocdn.com/@google/genai@^1.27.0"
+    }
+  }
+  </script>
+
+  <style>
+    .glass-panel {
+      background:
+        radial-gradient(circle at top left, rgba(56,189,248,0.16), transparent 55%),
+        radial-gradient(circle at bottom right, rgba(129,140,248,0.16), transparent 55%),
+        rgba(15,23,42,0.96);
+      backdrop-filter: blur(18px);
+    }
+    .compass-shell {
+      box-shadow:
+        0 12px 32px rgba(15,23,42,0.9),
+        0 0 0 1px rgba(15,23,42,1),
+        0 0 24px rgba(56,189,248,0.55);
+    }
+    .compass-pulse {
+      box-shadow:
+        0 0 28px rgba(56,189,248,0.7),
+        0 0 70px rgba(37,99,235,0.6);
+      transform: scale(1.04);
+    }
+    .btn-3d {
+      box-shadow:
+        0 10px 24px rgba(15,23,42,0.9),
+        0 0 0 1px rgba(15,23,42,1);
+    }
+    .btn-3d-pressed {
+      transform: translateY(1px) scale(0.98);
+      box-shadow:
+        0 6px 16px rgba(15,23,42,0.95),
+        0 0 0 1px rgba(15,23,42,1);
+    }
+    .animate-fade-in {
+      animation: fade-in 0.2s ease-out;
+    }
+    @keyframes fade-in {
+      from { opacity: 0; transform: translateY(2px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* fixed, scrollable transcript box */
+    #transcript {
+      max-height: 22rem;
+      min-height: 16rem;
+    }
+    @media (min-width: 1024px) {
+      #transcript {
+        max-height: 26rem;
+        min-height: 18rem;
+      }
+    }
+  </style>
+</head>
+
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <div class="min-h-screen flex items-start justify-center px-3 py-4">
+    <div class="w-full max-w-6xl glass-panel rounded-3xl border border-slate-800 shadow-2xl shadow-sky-900/40 p-4 md:p-6 lg:p-8">
+      <div class="grid lg:grid-cols-[2.4fr,3.2fr] gap-6 lg:gap-8 items-stretch">
+        <!-- LEFT: header + setup + topics + start -->
+        <div class="flex flex-col gap-6">
+          <!-- Header -->
+          <header class="flex items-center gap-4">
+            <div id="compass-shell"
+                 class="relative h-16 w-16 md:h-20 md:w-20 rounded-2xl bg-gradient-to-br from-sky-500/25 via-slate-900 to-indigo-800/50 border border-sky-400/60 flex items-center justify-center transition-all duration-300 compass-shell">
+              <div class="absolute inset-0 rounded-2xl bg-gradient-to-br from-slate-50/10 to-slate-900/60"></div>
+              <svg viewBox="0 0 64 64" class="relative h-11 w-11 text-sky-100 drop-shadow-lg">
+                <defs>
+                  <linearGradient id="compassGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#38bdf8"/>
+                    <stop offset="50%" stop-color="#0ea5e9"/>
+                    <stop offset="100%" stop-color="#4f46e5"/>
+                  </linearGradient>
+                </defs>
+                <circle cx="32" cy="32" r="28" fill="url(#compassGradient)" opacity="0.25" />
+                <circle cx="32" cy="32" r="22" fill="none" stroke="#e5e7eb" stroke-width="1.3" stroke-opacity="0.5" />
+                <circle cx="32" cy="32" r="3" fill="#e5e7eb"/>
+                <polygon points="32,11 25,34 32,29 39,34"
+                         fill="#f97316" stroke="#0f172a" stroke-width="0.7"/>
+                <polygon points="32,53 25,30 32,35 39,30"
+                         fill="#0ea5e9" stroke="#0f172a" stroke-width="0.7"/>
+              </svg>
+            </div>
+
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center justify-between gap-2">
+                <div class="min-w-0">
+                  <h1 class="text-xl md:text-2xl font-semibold tracking-tight text-slate-50">
+                    The Wanderer
+                  </h1>
+                  <p class="text-xs md:text-sm text-slate-300/85 truncate">
+                    Converse in your non-native tongue.
+                  </p>
+                </div>
+                <div class="flex flex-col items-end gap-1">
+                  <div class="inline-flex items-center gap-2 rounded-full bg-slate-900/80 border border-slate-700/80 px-2.5 py-1">
+                    <span id="status-dot" class="h-2.5 w-2.5 rounded-full bg-slate-500"></span>
+                    <span id="status-text" class="text-[0.7rem] md:text-xs text-slate-300/90">
+                      Ready to Wander
+                    </span>
+                  </div>
+                  <div id="live-badge"
+                       class="inline-flex items-center gap-1 rounded-full border border-rose-500/70 bg-rose-500/10 px-2 py-0.5 text-[0.65rem] font-medium text-rose-100/90 opacity-0 scale-95 transition">
+                    <span class="h-1.5 w-1.5 rounded-full bg-rose-400 animate-ping"></span>
+                    <span class="h-1.5 w-1.5 rounded-full bg-rose-400 rounded-full"></span>
+                    <span class="tracking-[0.18em] uppercase">Live</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <!-- Error banner -->
+          <div id="error-banner"
+               class="hidden rounded-2xl border border-rose-500/70 bg-rose-500/10 px-3 py-2.5 text-xs md:text-sm text-rose-100 flex items-start gap-2">
+            <svg class="mt-0.5 h-4 w-4 flex-none text-rose-300" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd"
+                    d="M8.257 3.099c.765-1.36 2.721-1.36 3.486 0l6.518 11.587C19.02 16.632 18.242 18 16.77 18H3.23c-1.473 0-2.25-1.368-1.491-3.314L8.257 3.1zM11 14a1 1 0 10-2 0 1 1 0 002 0zm-.25-6.75a.75.75 0 00-1.5 0v4.5a.75.75 0 001.5 0v-4.5z"
+                    clip-rule="evenodd" />
+            </svg>
+            <p id="error-text" class="leading-snug">
+              Something went wrong.
+            </p>
+          </div>
+
+          <!-- Setup card -->
+          <section class="rounded-3xl border border-slate-800/80 bg-slate-950/70 px-3.5 py-4 md:px-4 md:py-5 flex flex-col gap-4">
+            <!-- Language -->
+            <div>
+              <div class="flex items-center justify-between mb-1.5">
+                <span class="text-[0.7rem] font-semibold tracking-[0.18em] uppercase text-slate-300">
+                  Language
+                </span>
+                <span class="text-[0.68rem] text-slate-400">Wanderer lives in this tongue only</span>
+              </div>
+              <select id="target-language"
+                      class="w-full rounded-2xl bg-slate-900/90 border border-slate-700 text-xs md:text-sm px-3 py-2.5 text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-400/80">
+                <option value="en-US">English (US)</option>
+                <option value="fr-FR">Français</option>
+                <option value="es-ES">Español (ES)</option>
+                <option value="it-IT">Italiano</option>
+                <option value="ja-JP">日本語</option>
+                <option value="pt-BR">Português (BR)</option>
+                <option value="ru-RU">Русский</option>
+                <option value="cmn-CN">中文 (Mandarin)</option>
+                <option value="ur-PK">Urdu</option>
+              </select>
+            </div>
+
+            <!-- Persona / depth -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div>
+                <p class="text-[0.7rem] font-semibold tracking-[0.18em] uppercase text-slate-300 mb-1.5">
+                  Persona
+                </p>
+                <div class="flex flex-wrap gap-2" id="persona-buttons">
+                  <button data-persona="pal"
+                          class="persona-btn inline-flex items-center gap-1.5 rounded-full border border-slate-600/80 bg-slate-900/80 px-3 py-1.5 text-[0.7rem] md:text-xs text-slate-200 hover:border-sky-400/80 hover:bg-slate-800/80 transition">
+                    <span>🧑‍🤝‍🧑</span>
+                    <span>Pal</span>
+                  </button>
+                  <button data-persona="mentor"
+                          class="persona-btn inline-flex items-center gap-1.5 rounded-full border border-slate-600/80 bg-slate-900/80 px-3 py-1.5 text-[0.7rem] md:text-xs text-slate-200 hover:border-sky-400/80 hover:bg-slate-800/80 transition">
+                    <span>🧓</span>
+                    <span>Mentor</span>
+                  </button>
+                  <button data-persona="stranger-at-the-bar"
+                          class="persona-btn inline-flex items-center gap-1.5 rounded-full border border-slate-600/80 bg-slate-900/80 px-3 py-1.5 text-[0.7rem] md:text-xs text-slate-200 hover:border-sky-400/80 hover:bg-slate-800/80 transition">
+                    <span>🍸</span>
+                    <span>Stranger</span>
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <p class="text-[0.7rem] font-semibold tracking-[0.18em] uppercase text-slate-300 mb-1.5">
+                  Depth
+                </p>
+                <div class="flex flex-wrap gap-2" id="depth-buttons">
+                  <button data-depth="casual"
+                          class="depth-btn inline-flex items-center gap-1.5 rounded-full border border-slate-600/80 bg-slate-900/80 px-3 py-1.5 text-[0.7rem] md:text-xs text-slate-200 hover:border-sky-400/80 hover:bg-slate-800/80 transition">
+                    <span>🌊</span>
+                    <span>Casual</span>
+                  </button>
+                  <button data-depth="deep"
+                          class="depth-btn inline-flex items-center gap-1.5 rounded-full border border-slate-600/80 bg-slate-900/80 px-3 py-1.5 text-[0.7rem] md:text-xs text-slate-200 hover:border-sky-400/80 hover:bg-slate-800/80 transition">
+                    <span>🌌</span>
+                    <span>Deep</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Topic monologue -->
+            <div>
+              <div class="flex items-center justify-between mb-1.5">
+                <p class="text-[0.7rem] font-semibold tracking-[0.18em] uppercase text-slate-300">
+                  Topic monologue
+                </p>
+                <span class="text-[0.68rem] text-slate-400">Wanderer speaks, you just listen</span>
+              </div>
+              <div class="flex flex-wrap gap-1.5 text-[0.68rem]" id="topic-buttons">
+                <button data-topic="History"
+                        class="topic-btn inline-flex items-center gap-1.5 rounded-full border border-slate-600/80 bg-slate-900/80 px-2.5 py-1 text-slate-200 hover:border-amber-400/80 hover:bg-slate-800/80 transition">
+                  <span>🏺</span><span>History</span>
+                </button>
+                <button data-topic="Geography"
+                        class="topic-btn inline-flex items-center gap-1.5 rounded-full border border-slate-600/80 bg-slate-900/80 px-2.5 py-1 text-slate-200 hover:border-amber-400/80 hover:bg-slate-800/80 transition">
+                  <span>🗺️</span><span>Geography</span>
+                </button>
+                <button data-topic="Politics"
+                        class="topic-btn inline-flex items-center gap-1.5 rounded-full border border-slate-600/80 bg-slate-900/80 px-2.5 py-1 text-slate-200 hover:border-amber-400/80 hover:bg-slate-800/80 transition">
+                  <span>🏛️</span><span>Politics</span>
+                </button>
+                <button data-topic="Art"
+                        class="topic-btn inline-flex items-center gap-1.5 rounded-full border border-slate-600/80 bg-slate-900/80 px-2.5 py-1 text-slate-200 hover:border-amber-400/80 hover:bg-slate-800/80 transition">
+                  <span>🎨</span><span>Art</span>
+                </button>
+                <button data-topic="Science"
+                        class="topic-btn inline-flex items-center gap-1.5 rounded-full border border-slate-600/80 bg-slate-900/80 px-2.5 py-1 text-slate-200 hover:border-amber-400/80 hover:bg-slate-800/80 transition">
+                  <span>🔬</span><span>Science</span>
+                </button>
+                <button data-topic="Philosophy"
+                        class="topic-btn inline-flex items-center gap-1.5 rounded-full border border-slate-600/80 bg-slate-900/80 px-2.5 py-1 text-slate-200 hover:border-amber-400/80 hover:bg-slate-800/80 transition">
+                  <span>🧠</span><span>Philosophy</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Connect button -->
+            <div class="pt-3 border-t border-slate-800/70">
+              <button id="start-btn"
+                      class="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs md:text-sm font-semibold px-4 py-2.5 btn-3d active:btn-3d-pressed disabled:opacity-60 disabled:cursor-not-allowed">
+                <span class="h-2 w-2 rounded-full bg-emerald-800/90"></span>
+                <span id="start-btn-label">Connect &amp; start</span>
+              </button>
+            </div>
+          </section>
+        </div>
+
+        <!-- RIGHT: transcript + mic controls -->
+        <div class="flex flex-col gap-4">
+          <!-- Transcript -->
+          <section class="rounded-3xl border border-slate-800/80 bg-slate-950/80 flex flex-col">
+            <div class="px-3.5 pt-3.5 pb-2 border-b border-slate-800/80 flex items-center justify-between">
+              <div>
+                <h2 class="text-[0.72rem] font-semibold tracking-[0.18em] uppercase text-slate-300">
+                  Live transcript
+                </h2>
+                <p class="text-[0.68rem] text-slate-400">
+                  You &amp; Wanderer · in your target language only
+                </p>
+              </div>
+              <div class="flex flex-col items-end gap-1">
+                <span id="mode-pill"
+                      class="inline-flex items-center gap-1 rounded-full border border-slate-700/90 px-2 py-0.5 text-[0.65rem] uppercase tracking-[0.16em] text-slate-300/90">
+                  <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+                  Passive listening
+                </span>
+              </div>
+            </div>
+            <div id="transcript"
+                 class="flex-1 overflow-y-auto px-3.5 pt-2.5 pb-3.5 space-y-1 text-sm">
+            </div>
+          </section>
+
+          <!-- Controls -->
+          <section class="flex flex-col items-center gap-3">
+            <div class="flex items-center justify-center gap-3 w-full">
+              <!-- Exit -->
+              <button id="exit-btn"
+                      class="inline-flex items-center justify-center rounded-2xl bg-rose-600/90 hover:bg-rose-500 text-slate-50 text-xs font-semibold px-3.5 py-2.5 btn-3d active:btn-3d-pressed">
+                <span class="mr-1">⏏️</span>
+                Exit
+              </button>
+
+              <!-- Mic -->
+              <button id="hold-btn"
+                      class="flex items-center justify-center rounded-full w-20 h-20 md:w-24 md:h-24 bg-emerald-500 hover:bg-emerald-400 text-slate-950 btn-3d active:btn-3d-pressed transition relative">
+                <div class="absolute inset-1 rounded-full bg-gradient-to-br from-emerald-300 via-emerald-400 to-emerald-500 flex items-center justify-center">
+                  <span class="text-2xl md:text-3xl">🎤</span>
+                </div>
+              </button>
+
+              <!-- Liveliness -->
+              <button id="liveliness-btn"
+                      class="inline-flex items-center justify-between rounded-2xl border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-xs text-sky-100 hover:bg-sky-500/20 transition flex-1 md:flex-none">
+                <div class="flex items-center gap-1.5">
+                  <span id="liveliness-dot" class="h-2 w-2 rounded-full bg-slate-500 shadow-sm"></span>
+                  <span class="font-semibold tracking-[0.16em] uppercase text-[0.7rem]">
+                    Liveliness
+                  </span>
+                </div>
+                <span id="liveliness-label" class="text-[0.7rem] text-sky-100/90">
+                  <!-- label intentionally minimal -->
+                </span>
+              </button>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Logic -->
+  <script type="module">
+    import { GoogleGenAI, Modality } from "@google/genai";
+
+    const GEMINI_API_KEY = "AIzaSyAziQpt72ga-gG5HL_i11QbGz7sBM9kL1k";
+    const MODEL_ID = "gemini-2.5-flash-native-audio-preview-09-2025";
+
+    const ConversationStatus = {
+      IDLE: "idle",
+      CONNECTING: "connecting",
+      CONNECTED: "connected",
+      ERROR: "error",
+    };
+
+    let status = ConversationStatus.IDLE;
+    let errorMessage = "";
+    let transcriptHistory = [];
+    let currentInput = "";
+    let currentOutput = "";
+
+    let persona = "pal";
+    let depth = "casual";
+    let targetLanguage = "en-US";
+
+    let aiClient = null;
+    let session = null;
+
+    let inputAudioContext = null;
+    let outputAudioContext = null;
+    let mediaStream = null;
+    let scriptProcessor = null;
+    let nextStartTime = 0;
+    const audioSources = new Set();
+    let transcriptionTimeoutId = null;
+
+    let isHolding = false;
+    let holdInputBuffer = "";
+    let livelinessEnabled = false;
+    let livelinessFollowUpCount = 0;
+    let reEngagementTimerId = null;
+
+    let topicMonologue = { isActive: false, turnsRemaining: 0, topic: "" };
+
+    let compassSpeakTimeout = null;
+
+    const statusDot = document.getElementById("status-dot");
+    const statusText = document.getElementById("status-text");
+    const liveBadge = document.getElementById("live-badge");
+    const errorBanner = document.getElementById("error-banner");
+    const errorText = document.getElementById("error-text");
+    const transcriptEl = document.getElementById("transcript");
+    const startBtn = document.getElementById("start-btn");
+    const startBtnLabel = document.getElementById("start-btn-label");
+    const exitBtn = document.getElementById("exit-btn");
+    const targetLanguageSelect = document.getElementById("target-language");
+    const personaButtons = Array.from(document.querySelectorAll(".persona-btn"));
+    const depthButtons = Array.from(document.querySelectorAll(".depth-btn"));
+    const topicButtons = Array.from(document.querySelectorAll(".topic-btn"));
+    const livelinessBtn = document.getElementById("liveliness-btn");
+    const livelinessLabel = document.getElementById("liveliness-label");
+    const livelinessDot = document.getElementById("liveliness-dot");
+    const modePill = document.getElementById("mode-pill");
+    const holdBtn = document.getElementById("hold-btn");
+    const compassShell = document.getElementById("compass-shell");
+
+    const LANG_NAME = {
+      "en-US": "English",
+      "fr-FR": "Français",
+      "es-ES": "Español",
+      "it-IT": "Italiano",
+      "ja-JP": "日本語",
+      "pt-BR": "Português",
+      "ru-RU": "Русский",
+      "cmn-CN": "Mandarin",
+      "ur-PK": "Urdu",
+    };
+
+    function escapeHtml(text) {
+      return (text || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    function generateSystemInstruction(personaKey, depthKey, targetLanguageName) {
+      const personaInstructions = {
+        "pal":
+          "You are an old friend, warm and familiar. You catch up with the user as if you've known each other for years, sharing jokes and memories.",
+        "mentor":
+          "You are a wise, old-school instructor, like a grandfather or uncle. You guide the user patiently, teaching them and offering thoughtful advice.",
+        "stranger-at-the-bar":
+          "You are a stranger at a bar. The conversation should grow organically and naturally. You don't know each other, so it's a fresh start with a bit of mystery and casual discovery.",
+      };
+
+      const depthInstructions = {
+        "casual":
+          "Keep the conversation light, easy-going, and brief. Your responses should be short and conversational, like small talk, generally 1-2 sentences. Avoid deep topics. Your goal is to make statements and share quick thoughts, not to interview the user. It is critical that you ask almost no questions. A natural conversation flows from statements, not constant questions.",
+        "deep":
+          "Engage in a more profound and meaningful conversation. Provide detailed, thoughtful, and longer responses, exploring complex ideas, opinions, and philosophies. Your goal is to share your perspective, not to interview the user. It is critical that you avoid asking questions unless it is absolutely essential to understand their point. Focus on making statements and elaborating on the topic.",
+      };
+
+      const languageRules = `
+STRICT RULES:
+1. You MUST speak and respond ONLY in ${targetLanguageName}. This is an absolute, unbreakable rule.
+2. The user is learning ${targetLanguageName}. You MUST interpret ALL of their speech as ${targetLanguageName}, no matter how imperfect it is or if it sounds like another language. This is a critical instruction. Force yourself to understand it as ${targetLanguageName}.
+3. Do NOT switch languages for any reason. Do NOT offer translations. Do NOT acknowledge any other language. If the user speaks another language, you must continue to respond in ${targetLanguageName} as if they were also speaking ${targetLanguageName}.
+4. If the user starts speaking while you are talking, you MUST stop talking immediately and listen to them.`;
+
+      return (
+        personaInstructions[personaKey] +
+        " " +
+        depthInstructions[depthKey] +
+        " " +
+        languageRules
+      );
+    }
+
+    function setStatus(newStatus) {
+      status = newStatus;
+      updateStatusUI();
+    }
+
+    function setError(msg) {
+      errorMessage = msg || "";
+      if (errorMessage) {
+        errorBanner.classList.remove("hidden");
+        errorText.textContent = errorMessage;
+      } else {
+        errorBanner.classList.add("hidden");
+      }
+    }
+
+    function updateStatusUI() {
+      let label = "Ready to Wander";
+      let liveVisible = false;
+      let dotClass = "bg-slate-500";
+
+      if (status === ConversationStatus.CONNECTING) {
+        label = "Connecting…";
+        dotClass = "bg-amber-400 animate-pulse";
+      } else if (status === ConversationStatus.CONNECTED) {
+        label = "Live";
+        dotClass = "bg-emerald-400";
+        liveVisible = true;
+      } else if (status === ConversationStatus.ERROR) {
+        label = errorMessage || "Connection error";
+        dotClass = "bg-rose-500";
+      }
+
+      statusDot.className =
+        "h-2.5 w-2.5 rounded-full transition " + dotClass;
+      statusText.textContent = label;
+
+      if (liveVisible) {
+        liveBadge.style.opacity = "1";
+        liveBadge.style.transform = "scale(1)";
+      } else {
+        liveBadge.style.opacity = "0";
+        liveBadge.style.transform = "scale(0.95)";
+      }
+
+      if (
+        status === ConversationStatus.CONNECTING ||
+        status === ConversationStatus.CONNECTED
+      ) {
+        startBtn.disabled = true;
+        startBtnLabel.textContent =
+          status === ConversationStatus.CONNECTING ? "Connecting…" : "Connect & start";
+        startBtn.classList.remove("bg-emerald-500", "hover:bg-emerald-400", "text-slate-950");
+        startBtn.classList.add("bg-slate-800", "hover:bg-slate-700", "text-sky-100");
+      } else {
+        startBtn.disabled = false;
+        startBtnLabel.textContent = "Connect & start";
+        startBtn.classList.add("bg-emerald-500", "hover:bg-emerald-400", "text-slate-950");
+        startBtn.classList.remove("bg-slate-800", "hover:bg-slate-700", "text-sky-100");
+      }
+    }
+
+    function setCompassSpeaking() {
+      compassShell.classList.add("compass-pulse");
+      if (compassSpeakTimeout) clearTimeout(compassSpeakTimeout);
+      compassSpeakTimeout = setTimeout(() => {
+        compassShell.classList.remove("compass-pulse");
+      }, 600);
+    }
+
+    function renderTranscript() {
+      const all = [...transcriptHistory];
+      if (currentInput) {
+        all.push({ speaker: "user", text: currentInput, temp: true });
+      }
+      if (currentOutput) {
+        all.push({ speaker: "model", text: currentOutput, temp: true });
+      }
+
+      if (!all.length && status === ConversationStatus.IDLE) {
+        transcriptEl.innerHTML = `
+          <p class="mt-4 text-xs text-slate-400 text-center px-4">
+            Tap <span class="text-emerald-300 font-medium">Connect &amp; start</span> and just speak.\n\nHint: Press the blue button for a more lively conversation (and wait after speaking).\n\nTip: Hold the green button to for a longer monologue.
+          </p>`;
+        return;
+      }
+
+      let html = "";
+      for (const t of all) {
+        if (!t.text) continue;
+        const isUser = t.speaker === "user";
+        const rowClass = isUser ? "justify-end" : "justify-start";
+        const bubbleClass = isUser
+          ? "bg-sky-600/95 rounded-br-none"
+          : "bg-slate-700/95 rounded-bl-none";
+        const label = isUser ? "You" : "Wanderer";
+
+        html += `
+          <div class="flex ${rowClass} mb-2 animate-fade-in">
+            <div class="max-w-xs md:max-w-md lg:max-w-lg px-3.5 py-2.5 rounded-3xl ${bubbleClass} shadow-md shadow-slate-900/70 border border-slate-900/70">
+              <p class="text-[0.7rem] uppercase tracking-[0.14em] text-slate-200/70 mb-0.5">${label}</p>
+              <p class="text-sm leading-relaxed whitespace-pre-wrap text-slate-50">${escapeHtml(
+                t.text
+              )}</p>
+            </div>
+          </div>`;
+      }
+      transcriptEl.innerHTML = html;
+      transcriptEl.scrollTop = transcriptEl.scrollHeight;
+    }
+
+    function setCurrentInputText(text) {
+      currentInput = text || "";
+      renderTranscript();
+    }
+
+    function setCurrentOutputText(text) {
+      currentOutput = text || "";
+      renderTranscript();
+    }
+
+    function encode(bytes) {
+      let binary = "";
+      for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return btoa(binary);
+    }
+
+    function decode(base64) {
+      const binaryString = atob(base64);
+      const len = binaryString.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      return bytes;
+    }
+
+    function resample(input, fromSampleRate, toSampleRate) {
+      if (fromSampleRate === toSampleRate) return input;
+      const ratio = fromSampleRate / toSampleRate;
+      const outputLength = Math.floor(input.length / ratio);
+      const output = new Float32Array(outputLength);
+      for (let i = 0; i < outputLength; i++) {
+        const floatIndex = i * ratio;
+        const index1 = Math.floor(floatIndex);
+        const index2 = index1 + 1;
+        if (index2 >= input.length) {
+          output[i] = input[index1];
+        } else {
+          const fraction = floatIndex - index1;
+          const value1 = input[index1];
+          const value2 = input[index2];
+          output[i] = value1 + (value2 - value1) * fraction;
+        }
+      }
+      return output;
+    }
+
+    function createBlobFromFloat(data) {
+      const l = data.length;
+      const int16 = new Int16Array(l);
+      for (let i = 0; i < l; i++) {
+        let s = data[i] * 32768;
+        if (s > 32767) s = 32767;
+        if (s < -32768) s = -32768;
+        int16[i] = s;
+      }
+      return {
+        data: encode(new Uint8Array(int16.buffer)),
+        mimeType: "audio/pcm;rate=16000",
+      };
+    }
+
+    async function decodeAudioData(dataUint8, ctx, sampleRate, numChannels) {
+      const dataInt16 = new Int16Array(dataUint8.buffer);
+      const frameCount = dataInt16.length / numChannels;
+      const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+      for (let channel = 0; channel < numChannels; channel++) {
+        const channelData = buffer.getChannelData(channel);
+        for (let i = 0; i < frameCount; i++) {
+          channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+        }
+      }
+      return buffer;
+    }
+
+    function stopAllAudio() {
+      for (const source of audioSources.values()) {
+        try { source.stop(); } catch (e) {}
+      }
+      audioSources.clear();
+      nextStartTime = 0;
+    }
+
+    function cleanup() {
+      if (scriptProcessor) {
+        try { scriptProcessor.disconnect(); } catch (e) {}
+        scriptProcessor = null;
+      }
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(t => t.stop());
+        mediaStream = null;
+      }
+      if (inputAudioContext) {
+        inputAudioContext.close().catch(() => {});
+        inputAudioContext = null;
+      }
+      if (outputAudioContext) {
+        outputAudioContext.close().catch(() => {});
+        outputAudioContext = null;
+      }
+
+      stopAllAudio();
+
+      if (session) {
+        try { session.close(); } catch (e) {}
+        session = null;
+      }
+      aiClient = null;
+
+      currentInput = "";
+      currentOutput = "";
+      if (transcriptionTimeoutId) {
+        clearTimeout(transcriptionTimeoutId);
+        transcriptionTimeoutId = null;
+      }
+      if (reEngagementTimerId) {
+        clearTimeout(reEngagementTimerId);
+        reEngagementTimerId = null;
+      }
+      holdInputBuffer = "";
+      isHolding = false;
+      topicMonologue = { isActive: false, turnsRemaining: 0, topic: "" };
+      livelinessFollowUpCount = 0;
+      renderTranscript();
+    }
+
+    function handleFatalError(message, error) {
+      console.error(message, error || "");
+      setError(message);
+      setStatus(ConversationStatus.ERROR);
+      cleanup();
+    }
+
+    async function startConversation() {
+      if (
+        status === ConversationStatus.CONNECTING ||
+        status === ConversationStatus.CONNECTED
+      ) return;
+
+      setError("");
+      setStatus(ConversationStatus.CONNECTING);
+      transcriptHistory = [];
+      currentInput = "";
+      currentOutput = "";
+      renderTranscript();
+
+      if (!GEMINI_API_KEY) {
+        handleFatalError("Missing Gemini API key.");
+        return;
+      }
+
+      const secure = window.isSecureContext;
+
+      try {
+        // simpler constraints for better mobile support
+        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (err) {
+        const proto = location.protocol;
+        const host = location.hostname;
+
+        if (!secure || (proto !== "https:" && host !== "localhost")) {
+          handleFatalError(
+            "Your browser is blocking the microphone because this page is not served over HTTPS or localhost. On mobile, open this HTML from a secure site (https) or a local server, not directly from the file manager.",
+            err
+          );
+        } else if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+          handleFatalError(
+            "Microphone access was denied. Allow mic permissions for your browser in system settings, close the tab, and reopen.",
+            err
+          );
+        } else {
+          handleFatalError(
+            "Microphone is unavailable on this device or browser. Try another browser or check mic settings.",
+            err
+          );
+        }
+        return;
+      }
+
+      try {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        inputAudioContext = new AC();
+        outputAudioContext = new AC({ sampleRate: 24000 });
+        nextStartTime = 0;
+
+        aiClient = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+
+        const targetLanguageName = LANG_NAME[targetLanguage] || "the selected language";
+        const systemInstruction = generateSystemInstruction(
+          persona,
+          depth,
+          targetLanguageName
+        );
+
+        const sessionPromise = aiClient.live.connect({
+          model: MODEL_ID,
+          config: {
+            responseModalities: [Modality.AUDIO],
+            speechConfig: {
+              voiceConfig: { prebuiltVoiceConfig: { voiceName: "Zephyr" } },
+              languageCode: targetLanguage,
+            },
+            systemInstruction,
+            inputAudioTranscription: {},
+            outputAudioTranscription: {},
+          },
+          callbacks: {
+            onopen: () => {
+              setStatus(ConversationStatus.CONNECTED);
+              try {
+                const source =
+                  inputAudioContext.createMediaStreamSource(mediaStream);
+                scriptProcessor =
+                  inputAudioContext.createScriptProcessor(4096, 1, 1);
+
+                scriptProcessor.onaudioprocess = (event) => {
+                  if (!sessionPromise) return;
+                  const inputData = event.inputBuffer.getChannelData(0);
+                  const resampled = resample(
+                    inputData,
+                    event.inputBuffer.sampleRate,
+                    16000
+                  );
+                  const blob = createBlobFromFloat(resampled);
+                  sessionPromise.then((sess) => {
+                    try {
+                      sess.sendRealtimeInput({ media: blob });
+                    } catch (e) {
+                      console.error("Error sending realtime input", e);
+                    }
+                  });
+                };
+
+                source.connect(scriptProcessor);
+                scriptProcessor.connect(inputAudioContext.destination);
+              } catch (e) {
+                handleFatalError("Failed to start microphone streaming.", e);
+              }
+            },
+            onmessage: async (message) => {
+              const server = message && message.serverContent;
+              if (!server) return;
+
+              const updateTranscriptUI = (isInput, text) => {
+                if (isInput) {
+                  currentInput += text;
+                } else {
+                  currentOutput += text;
+                }
+                if (transcriptionTimeoutId) {
+                  clearTimeout(transcriptionTimeoutId);
+                }
+                transcriptionTimeoutId = setTimeout(() => {
+                  setCurrentInputText(currentInput);
+                  setCurrentOutputText(currentOutput);
+                }, 50);
+              };
+
+              if (server.inputTranscription && server.inputTranscription.text) {
+                if (topicMonologue.isActive) {
+                  return;
+                }
+                if (reEngagementTimerId) clearTimeout(reEngagementTimerId);
+                livelinessFollowUpCount = 0;
+
+                const text = server.inputTranscription.text;
+                if (isHolding) {
+                  holdInputBuffer += text;
+                } else {
+                  updateTranscriptUI(true, text);
+                }
+              }
+
+              if (
+                server.outputTranscription &&
+                server.outputTranscription.text &&
+                !isHolding
+              ) {
+                updateTranscriptUI(false, server.outputTranscription.text);
+              }
+
+              if (server.interrupted) {
+                stopAllAudio();
+              }
+
+              if (server.turnComplete && !isHolding) {
+                if (transcriptionTimeoutId) {
+                  clearTimeout(transcriptionTimeoutId);
+                  transcriptionTimeoutId = null;
+                }
+
+                const finalInput = currentInput.trim();
+                const finalOutput = currentOutput.trim();
+
+                if (finalInput || finalOutput) {
+                  const now = Date.now();
+                  if (finalInput) {
+                    transcriptHistory.push({
+                      id: now,
+                      speaker: "user",
+                      text: finalInput,
+                    });
+                  }
+                  if (finalOutput) {
+                    transcriptHistory.push({
+                      id: now + 1,
+                      speaker: "model",
+                      text: finalOutput,
+                    });
+                  }
+                  currentInput = "";
+                  currentOutput = "";
+                  setCurrentInputText("");
+                  setCurrentOutputText("");
+                }
+
+                if (topicMonologue.isActive && topicMonologue.turnsRemaining > 0) {
+                  topicMonologue.turnsRemaining -= 1;
+                  if (topicMonologue.turnsRemaining > 0) {
+                    const continuationPrompt =
+                      depth === "casual"
+                        ? "SYSTEM PROMPT: Continue with the next short point, just one or two sentences."
+                        : "SYSTEM PROMPT: Continue the monologue with a more detailed, longer paragraph.";
+                    session && session.sendRealtimeInput({ text: continuationPrompt });
+                  } else {
+                    topicMonologue = {
+                      isActive: false,
+                      turnsRemaining: 0,
+                      topic: "",
+                    };
+                    updateTopicButtonsUI();
+                  }
+                } else if (
+                  livelinessEnabled &&
+                  livelinessFollowUpCount < 5
+                ) {
+                  const randomDelay = Math.random() * 3000 + 2000;
+                  if (reEngagementTimerId) clearTimeout(reEngagementTimerId);
+                  reEngagementTimerId = setTimeout(() => {
+                    if (
+                      session &&
+                      !isHolding &&
+                      !topicMonologue.isActive &&
+                      status === ConversationStatus.CONNECTED
+                    ) {
+                      livelinessFollowUpCount += 1;
+                      session.sendRealtimeInput({
+                        text:
+                          "The user is quiet. Continue the conversation by sharing another thought or expanding what you just said. Do not ask a question. Make a short statement, then wait for them.",
+                      });
+                    }
+                  }, randomDelay);
+                }
+              }
+
+              const base64Audio =
+                server.modelTurn &&
+                server.modelTurn.parts &&
+                server.modelTurn.parts[0] &&
+                server.modelTurn.parts[0].inlineData &&
+                server.modelTurn.parts[0].inlineData.data;
+
+              if (base64Audio && !isHolding) {
+                try {
+                  const audioCtx = outputAudioContext;
+                  nextStartTime = Math.max(nextStartTime, audioCtx.currentTime);
+                  const audioBuffer = await decodeAudioData(
+                    decode(base64Audio),
+                    audioCtx,
+                    24000,
+                    1
+                  );
+                  const source = audioCtx.createBufferSource();
+                  source.buffer = audioBuffer;
+                  source.connect(audioCtx.destination);
+                  source.addEventListener("ended", () =>
+                    audioSources.delete(source)
+                  );
+                  source.start(nextStartTime);
+                  audioSources.add(source);
+                  nextStartTime += audioBuffer.duration;
+                  setCompassSpeaking();
+                } catch (e) {
+                  console.error("Error playing audio", e);
+                }
+              }
+            },
+            onerror: (e) => {
+              handleFatalError(
+                "A session error occurred. The connection has been closed.",
+                e
+              );
+            },
+            onclose: () => {
+              if (status !== ConversationStatus.ERROR) {
+                cleanup();
+                setStatus(ConversationStatus.IDLE);
+              }
+            },
+          },
+        });
+
+        session = await sessionPromise;
+      } catch (err) {
+        handleFatalError(
+          "Failed to start conversation. Check network and API key.",
+          err
+        );
+      }
+    }
+
+    function stopConversation() {
+      if (session) {
+        cleanup();
+      }
+      setStatus(ConversationStatus.IDLE);
+      setError("");
+    }
+
+    function setHoldToTalkState(nextIsHolding) {
+      if (!session || status !== ConversationStatus.CONNECTED) return;
+
+      if (nextIsHolding) {
+        isHolding = true;
+        holdInputBuffer = "";
+        currentInput = "";
+        setCurrentInputText("");
+        stopAllAudio();
+        currentOutput = "";
+        setCurrentOutputText("");
+        if (reEngagementTimerId) {
+          clearTimeout(reEngagementTimerId);
+          reEngagementTimerId = null;
+        }
+        topicMonologue = { isActive: false, turnsRemaining: 0, topic: "" };
+        updateTopicButtonsUI();
+        holdBtn.classList.add("ring-4", "ring-emerald-300/80", "scale-105");
+        modePill.textContent = "Hold-to-talk override";
+      } else {
+        isHolding = false;
+        const finalHeldText = holdInputBuffer.trim();
+        holdInputBuffer = "";
+        if (finalHeldText && session) {
+          const now = Date.now();
+          transcriptHistory.push({
+            id: now,
+            speaker: "user",
+            text: finalHeldText,
+          });
+          try {
+            session.sendRealtimeInput({ text: finalHeldText });
+          } catch (e) {
+            console.error("Error sending held text", e);
+          }
+        }
+        holdBtn.classList.remove("ring-4", "ring-emerald-300/80", "scale-105");
+        modePill.textContent = "Passive listening";
+      }
+      renderTranscript();
+    }
+
+    function updateLiveliness(enabled) {
+      livelinessEnabled = enabled;
+      if (!livelinessBtn) return;
+      if (enabled) {
+        livelinessDot.classList.remove("bg-slate-500");
+        livelinessDot.classList.add("bg-sky-300");
+        livelinessLabel.textContent = " ";
+        livelinessBtn.classList.add("ring-1", "ring-sky-400", "shadow-inner");
+        livelinessFollowUpCount = 0;
+      } else {
+        livelinessDot.classList.add("bg-slate-500");
+        livelinessDot.classList.remove("bg-sky-300");
+        livelinessLabel.textContent = " ";
+        livelinessBtn.classList.remove("ring-1", "ring-sky-400", "shadow-inner");
+        if (reEngagementTimerId) {
+          clearTimeout(reEngagementTimerId);
+          reEngagementTimerId = null;
+        }
+      }
+    }
+
+    function toggleTopicMonologue(topic) {
+      if (!session || status !== ConversationStatus.CONNECTED) return;
+
+      if (topicMonologue.isActive && topicMonologue.topic === topic) {
+        topicMonologue = { isActive: false, turnsRemaining: 0, topic: "" };
+        updateTopicButtonsUI();
+        return;
+      }
+
+      const turns =
+        depth === "casual"
+          ? Math.floor(Math.random() * 3) + 3
+          : Math.floor(Math.random() * 4) + 5;
+
+      topicMonologue = { isActive: true, turnsRemaining: turns, topic };
+      updateTopicButtonsUI();
+      updateLiveliness(false);
+
+      session.sendRealtimeInput({
+        text:
+          'SYSTEM PROMPT: Start a ' +
+          depth +
+          ' monologue about "' +
+          topic +
+          '". Discuss very current events or advanced, niche concepts related to it, but avoid being obscure. Do not ask questions. Do not wait for user input; I will prompt you to continue.',
+      });
+    }
+
+    function updatePersonaButtonsUI() {
+      personaButtons.forEach((btn) => {
+        const value = btn.getAttribute("data-persona");
+        if (value === persona) {
+          btn.classList.add(
+            "bg-sky-600/80",
+            "border-sky-300/80",
+            "text-slate-50"
+          );
+          btn.classList.remove("bg-slate-900/80", "border-slate-600/80");
+        } else {
+          btn.classList.remove(
+            "bg-sky-600/80",
+            "border-sky-300/80",
+            "text-slate-50"
+          );
+          btn.classList.add("bg-slate-900/80", "border-slate-600/80");
+        }
+      });
+    }
+
+    function updateDepthButtonsUI() {
+      depthButtons.forEach((btn) => {
+        const value = btn.getAttribute("data-depth");
+        if (value === depth) {
+          btn.classList.add(
+            "bg-indigo-600/80",
+            "border-indigo-300/80",
+            "text-slate-50"
+          );
+          btn.classList.remove("bg-slate-900/80", "border-slate-600/80");
+        } else {
+          btn.classList.remove(
+            "bg-indigo-600/80",
+            "border-indigo-300/80",
+            "text-slate-50"
+          );
+          btn.classList.add("bg-slate-900/80", "border-slate-600/80");
+        }
+      });
+    }
+
+    function updateTopicButtonsUI() {
+      topicButtons.forEach((btn) => {
+        const value = btn.getAttribute("data-topic");
+        const selected =
+          topicMonologue.isActive && topicMonologue.topic === value;
+        if (selected) {
+          btn.classList.add(
+            "border-amber-300/90",
+            "bg-amber-500/25",
+            "text-amber-50",
+            "ring-1",
+            "ring-amber-400/80"
+          );
+        } else {
+          btn.classList.remove(
+            "border-amber-300/90",
+            "bg-amber-500/25",
+            "text-amber-50",
+            "ring-1",
+            "ring-amber-400/80"
+          );
+          btn.classList.add("border-slate-600/80", "bg-slate-900/80");
+        }
+      });
+    }
+
+    // UI event wiring
+    targetLanguageSelect.addEventListener("change", (e) => {
+      targetLanguage = e.target.value;
+    });
+
+    personaButtons.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const value = btn.getAttribute("data-persona") || "pal";
+        persona = value;
+        updatePersonaButtonsUI();
+        if (status === ConversationStatus.CONNECTED && session) {
+          session.sendRealtimeInput({
+            text: "SYSTEM PROMPT: Update your behavior to match the new persona immediately.",
+          });
+        }
+      });
+    });
+
+    depthButtons.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const value = btn.getAttribute("data-depth") || "casual";
+        depth = value;
+        updateDepthButtonsUI();
+        if (status === ConversationStatus.CONNECTED && session) {
+          session.sendRealtimeInput({
+            text: "SYSTEM PROMPT: Adjust how detailed your replies are according to the new depth setting.",
+          });
+        }
+      });
+    });
+
+    topicButtons.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const topic = btn.getAttribute("data-topic");
+        if (!topic) return;
+        toggleTopicMonologue(topic);
+      });
+    });
+
+    livelinessBtn.addEventListener("click", () => {
+      if (status !== ConversationStatus.CONNECTED || !session) return;
+      updateLiveliness(!livelinessEnabled);
+    });
+
+    startBtn.addEventListener("click", () => {
+      if (
+        status === ConversationStatus.IDLE ||
+        status === ConversationStatus.ERROR
+      ) {
+        startConversation();
+      }
+    });
+
+    exitBtn.addEventListener("click", () => {
+      stopConversation();
+      transcriptHistory = [];
+      renderTranscript();
+    });
+
+    function pointerDown(e) {
+      e.preventDefault();
+      setHoldToTalkState(true);
+    }
+    function pointerUp(e) {
+      e.preventDefault();
+      if (isHolding) setHoldToTalkState(false);
+    }
+
+    holdBtn.addEventListener("pointerdown", pointerDown);
+    holdBtn.addEventListener("pointerup", pointerUp);
+    holdBtn.addEventListener("pointerleave", pointerUp);
+    holdBtn.addEventListener("touchstart", pointerDown, { passive: false });
+    holdBtn.addEventListener("touchend", pointerUp);
+    holdBtn.addEventListener("touchcancel", pointerUp);
+
+    updatePersonaButtonsUI();
+    updateDepthButtonsUI();
+    updateTopicButtonsUI();
+    updateLiveliness(false);
+    setStatus(ConversationStatus.IDLE);
+    renderTranscript();
+  </script>
+</body>
+</html>

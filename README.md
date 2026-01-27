@@ -4,4 +4,4 @@ const GEMINI_API_KEY = "PLACE KEY HERE";
 ```
 The API key can be obtained from google ai studio and you **do not** need the premium one for this.
 
-The Google audio preview file keeps changing too, so update that just below the API key also.
+The Google audio preview model keeps changing too, so update that just below the API key also.
